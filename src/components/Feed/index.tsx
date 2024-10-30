@@ -1,4 +1,4 @@
-import { useInfiniteQuery } from "@tanstack/react-query";
+import { useInfiniteQuery, useMutation } from "@tanstack/react-query";
 import "./feed.css";
 import { BASE_URL } from "@/constants";
 import { Post, PostData } from "../Post";
@@ -25,8 +25,13 @@ export const Feed = () => {
     initialPageParam: 0,
   });
 
+  const { mutate: sendImpression } = useMutation({
+    mutationFn: (id: string) => fetch(`${BASE_URL}?itemId=${id}`),
+  });
+
   const observerRef = useRef<IntersectionObserver | null>(null);
   const sentinelRef = useRef<HTMLDivElement | null>(null);
+  const postRefs = useRef<Map<string, HTMLDivElement>>(new Map());
 
   useEffect(() => {
     if (!sentinelRef.current) return;
@@ -46,11 +51,40 @@ export const Feed = () => {
     return () => observerRef.current?.disconnect();
   }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
 
+  useEffect(() => {
+    const impressionObserver = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          const target = entry.target as HTMLDivElement;
+          const postId = target.getAttribute("data-id");
+          if (entry.isIntersecting && postId) {
+            sendImpression(postId);
+            impressionObserver.unobserve(target);
+          }
+        });
+      },
+      { threshold: 0.5 }
+    );
+
+    postRefs.current.forEach((post) => {
+      impressionObserver.observe(post);
+    });
+
+    return () => impressionObserver.disconnect();
+  }, [feed, sendImpression]);
+
   return (
     <div className="feed-container">
       {feed
         ? feed.pages.flatMap((page) =>
-            page.data.map((post, index) => <Post key={post.id + index} {...post} />)
+            page.data.map((post, index) => (
+              <div
+                key={post.id + index}
+                ref={(el) => el && postRefs.current.set(post.id, el)}
+                data-id={post.id}>
+                <Post {...post} />
+              </div>
+            ))
           )
         : null}
       {isFetchingNextPage && <p>Loading more posts...</p>}
