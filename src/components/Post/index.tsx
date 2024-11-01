@@ -48,7 +48,7 @@ export const Post = ({
         <div className="post-username">
           <span>{username}</span>
           <span>
-            {shopName} · {formatTimeAgo(date)}
+            <span className="shop-link">{shopName}</span> · {formatTimeAgo(date)}
           </span>
         </div>
       </div>
